@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook-helm-render
+  namespace: argocd
+  annotations:
+    demo.argocd-lint.io/render-from: render-sources/helm/guestbook
+  labels:
+    app.kubernetes.io/name: guestbook-helm-render
+    render: helm
+spec:
+  project: demos
+  source:
+    repoURL: https://github.com/example/gitops.git
+    targetRevision: main
+    path: render-sources/helm/guestbook
+    helm:
+      releaseName: guestbook
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: render-helm
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

@@ -1,0 +1,16 @@
+# Baseline rulebook shared across teams
+severityThreshold: warn
+
+rules:
+  AR001:
+    severity: error
+  AR006:
+    enabled: false
+
+overrides:
+  - pattern: "manifests/environments/prod/**"
+    rules:
+      AR007:
+        severity: error
+      AR004:
+        severity: error

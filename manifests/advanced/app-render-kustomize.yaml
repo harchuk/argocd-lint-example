@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payments-kustomize-render
+  namespace: argocd
+  annotations:
+    demo.argocd-lint.io/render-from: render-sources/kustomize/overlays/prod
+  labels:
+    app.kubernetes.io/name: payments-kustomize-render
+    render: kustomize
+spec:
+  project: demos
+  source:
+    repoURL: https://github.com/example/gitops.git
+    targetRevision: main
+    path: render-sources/kustomize/overlays/prod
+    kustomize:
+      commonAnnotations:
+        argocd-lint.io/render: "true"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: render-kustomize
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

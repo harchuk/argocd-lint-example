@@ -1,0 +1,30 @@
+# Opinionated defaults when running inside Argo CD repo-server via CMP
+severityThreshold: warn
+
+rules:
+  AR001:
+    severity: error
+  AR004:
+    severity: error
+  AR005:
+    severity: error
+  AR007:
+    severity: error
+
+plugins:
+  - bundles/drift
+
+# Ensure special cases like runbooks or legacy apps are still linted but allowed to warn
+overrides:
+  - pattern: "manifests/legacy/**"
+    rules:
+      AR005:
+        severity: warn
+      AR007:
+        severity: warn
+  - pattern: "manifests/applicationsets/**"
+    rules:
+      AR008:
+        severity: error
+      AR011:
+        severity: error

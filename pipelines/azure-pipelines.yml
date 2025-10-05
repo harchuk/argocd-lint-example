@@ -1,0 +1,49 @@
+trigger:
+  - main
+
+pr:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  GO_VERSION: '1.22'
+
+stages:
+  - stage: lint
+    displayName: argocd-lint checks
+    jobs:
+      - job: lint
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: $(GO_VERSION)
+
+          - script: |
+              go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
+            displayName: Install argocd-lint
+
+          - script: |
+              scripts/lint.sh --severity-threshold=warn
+            displayName: Baseline lint
+
+          - script: |
+              sudo curl -L https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar -xz
+              sudo mv linux-amd64/helm /usr/local/bin/helm
+              GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@v5.1.0
+              export HELM_BINARY=$(command -v helm)
+              export KUSTOMIZE_BINARY=$(command -v kustomize)
+              scripts/lint_with_render.sh --severity-threshold=warn
+            displayName: Render + lint
+
+          - script: |
+              scripts/lint_security.sh --severity-threshold=warn --format json > argocd-lint-security.json
+            displayName: Security rulebook
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: $(System.DefaultWorkingDirectory)/argocd-lint-security.json
+              ArtifactName: lint-reports
+              publishLocation: Container
+            condition: always()

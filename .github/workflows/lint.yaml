@@ -1,0 +1,73 @@
+name: argocd-lint
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: baseline
+            command: scripts/lint.sh --severity-threshold=warn
+          - name: render
+            command: scripts/lint_with_render.sh --severity-threshold=warn
+            setup_render: true
+          - name: security
+            command: scripts/lint_security.sh --severity-threshold=warn
+            setup_plugins: true
+          - name: dry-run
+            command: scripts/lint_with_dry_run.sh --severity-threshold=error
+            setup_render: true
+            setup_dry_run: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Cache Go build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+
+      - name: Install argocd-lint
+        run: go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
+
+      - name: Install Helm
+        if: matrix.setup_render == true
+        uses: azure/setup-helm@v4
+
+      - name: Install Kustomize
+        if: matrix.setup_render == true
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: '5.0.3'
+
+      - name: Install kubeconform
+        if: matrix.setup_dry_run == true
+        run: go install github.com/yannh/kubeconform/cmd/kubeconform@latest
+
+      - name: Run argocd-lint (${{ matrix.name }})
+        run: ${{ matrix.command }}
+
+      - name: Export SARIF report (baseline only)
+        if: matrix.name == 'baseline'
+        run: argocd-lint manifests --rules argocd-lint-config/baseline.yaml --format sarif > argocd-lint.sarif
+
+      - name: Upload findings to GitHub Code Scanning
+        if: matrix.name == 'baseline'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: argocd-lint.sarif

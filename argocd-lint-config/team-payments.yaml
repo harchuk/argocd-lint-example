@@ -1,0 +1,24 @@
+# Rulebook tuned for the payments platform team
+severityThreshold: warn
+
+rules:
+  AR001:
+    severity: error
+  AR004:
+    severity: warn
+  AR007:
+    severity: error
+
+overrides:
+  - pattern: "manifests/environments/dev/**"
+    rules:
+      AR004:
+        severity: info
+      AR005:
+        enabled: false
+  - pattern: "manifests/environments/prod/**"
+    rules:
+      AR005:
+        severity: error
+      AR010:
+        severity: warn

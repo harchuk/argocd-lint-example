@@ -1,0 +1,40 @@
+# Reusable GitHub Actions job that can be dropped into a composite workflow.
+# Demonstrates how to parameterize severity threshold and optional rendering.
+name: lint-argocd
+
+on:
+  workflow_call:
+    inputs:
+      severity-threshold:
+        required: false
+        default: warn
+        type: string
+      render:
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install argocd-lint
+        run: go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
+
+      - name: Run argocd-lint
+        env:
+          SEVERITY_THRESHOLD: ${{ inputs.severity-threshold }}
+          WITH_RENDER: ${{ inputs.render }}
+        run: |
+          set -euo pipefail
+          ARGS=(manifests --rules argocd-lint-config/baseline.yaml --severity-threshold="${SEVERITY_THRESHOLD}")
+          if [[ "${WITH_RENDER}" == "true" ]]; then
+            ARGS+=(--render)
+          fi
+          argocd-lint "${ARGS[@]}"

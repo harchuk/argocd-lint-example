@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payments-service-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: payments-service
+    environment: prod
+spec:
+  project: payments
+  source:
+    repoURL: https://github.com/example/gitops.git
+    targetRevision: v2.3.1
+    path: services/payments/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: payments
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+  revisionHistoryLimit: 10
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jqPathExpressions:
+        - .spec.template.metadata.annotations["prometheus.io/scrape"]
+      name: payments-api

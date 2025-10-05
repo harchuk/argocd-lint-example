@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: overly-permissive-ignore
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/example/repo.git
+    targetRevision: main
+    path: services/legacy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: legacy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+  ignoreDifferences:
+    - kind: Deployment
+      jsonPointers:
+        - /spec/template

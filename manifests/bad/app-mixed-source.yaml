@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mixed-source
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/example/helm-repo.git
+    targetRevision: main
+    path: charts/frontend
+    chart: frontend
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: frontend

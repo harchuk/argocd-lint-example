@@ -1,0 +1,43 @@
+pipeline {
+  agent any
+  environment {
+    GOPATH = "${WORKSPACE}/.go"
+    GOCACHE = "${WORKSPACE}/.cache/go-build"
+  }
+  stages {
+    stage('Install argocd-lint') {
+      steps {
+        sh 'mkdir -p $GOPATH $GOCACHE'
+        sh 'go env -w GOPATH=$GOPATH GOCACHE=$GOCACHE'
+        sh 'go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest'
+      }
+    }
+    stage('Lint manifests') {
+      steps {
+        sh '$GOPATH/bin/argocd-lint manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn'
+      }
+    }
+    stage('Lint manifests (render)') {
+      steps {
+        sh '''
+          set -euo pipefail
+          HELM=$(command -v helm || true)
+          KUSTOMIZE=$(command -v kustomize || true)
+          EXTRA_FLAGS=""
+          if [ -n "$HELM" ]; then
+            EXTRA_FLAGS="$EXTRA_FLAGS --helm-binary $HELM"
+          fi
+          if [ -n "$KUSTOMIZE" ]; then
+            EXTRA_FLAGS="$EXTRA_FLAGS --kustomize-binary $KUSTOMIZE"
+          fi
+          $GOPATH/bin/argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render $EXTRA_FLAGS
+        '''
+      }
+    }
+  }
+  post {
+    always {
+      archiveArtifacts artifacts: '**/argocd-lint*.{json,sarif}', allowEmptyArchive: true
+    }
+  }
+}

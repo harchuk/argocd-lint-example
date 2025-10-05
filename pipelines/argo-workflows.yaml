@@ -1,0 +1,66 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: argocd-lint-
+spec:
+  entrypoint: lint
+  templates:
+    - name: lint
+      steps:
+        - - name: baseline
+            template: lint-step
+            arguments:
+              parameters:
+                - name: command
+                  value: scripts/lint.sh --severity-threshold=warn
+        - - name: render
+            template: lint-step
+            arguments:
+              parameters:
+                - name: command
+                  value: |
+                    export HELM_BINARY=$(command -v helm)
+                    export KUSTOMIZE_BINARY=$(command -v kustomize)
+                    scripts/lint_with_render.sh --severity-threshold=warn
+        - - name: security
+            template: lint-step
+            arguments:
+              parameters:
+                - name: command
+                  value: scripts/lint_security.sh --severity-threshold=warn --format json
+
+    - name: lint-step
+      inputs:
+        parameters:
+          - name: command
+      container:
+        image: golang:1.22
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - |
+            set -euo pipefail
+            go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
+            GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@v5.1.0
+            curl -sSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar -xz --strip-components=1 -C /usr/local/bin linux-amd64/helm
+            cd /workspace
+            {{inputs.parameters.command}}
+        workingDir: /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+      volumes:
+        - name: workspace
+          emptyDir: {}
+      initContainers:
+        - name: checkout
+          image: alpine/git
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - git clone {{ workflow.parameters.repo | default("https://github.com/harchuk/argocd-linter-example.git") }} /workspace
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace

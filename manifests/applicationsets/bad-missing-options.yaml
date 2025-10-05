@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: clusters-without-missingkey
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - cluster: qa
+            url: https://qa.example.com
+          - cluster: prod
+            url: https://prod.example.com
+  template:
+    metadata:
+      name: '{{cluster}}-app'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/example/argocd-apps.git
+        targetRevision: main
+        path: overlays/{{cluster}}
+      destination:
+        server: '{{url}}'
+      syncPolicy: {}

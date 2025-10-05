@@ -1,0 +1,39 @@
+version: 2.1
+
+orbs:
+  go: circleci/go@1.11.0
+  helm: circleci/helm@1.4.2
+
+jobs:
+  lint:
+    docker:
+      - image: cimg/go:1.22
+    steps:
+      - checkout
+      - go/install-tools:
+          cache: true
+          tools: github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
+      - run:
+          name: Baseline lint
+          command: scripts/lint.sh --severity-threshold=warn
+      - helm/install-helm:
+          version: v3.14.0
+      - run:
+          name: Install kustomize
+          command: go install sigs.k8s.io/kustomize/kustomize/v5@v5.1.0
+      - run:
+          name: Render + lint + dry-run
+          command: |
+            export HELM_BINARY=$(command -v helm)
+            export KUSTOMIZE_BINARY=$(command -v kustomize)
+            scripts/lint_with_dry_run.sh --severity-threshold=error --format table
+      - run:
+          name: Security lint (JSON)
+          command: scripts/lint_security.sh --format json > argocd-lint-security.json
+      - store_artifacts:
+          path: argocd-lint-security.json
+
+workflows:
+  lint:
+    jobs:
+      - lint

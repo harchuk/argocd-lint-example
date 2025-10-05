@@ -1,0 +1,5 @@
+apiVersion: v2
+name: guestbook
+version: 0.1.0
+description: Minimal Helm chart used to demonstrate argocd-lint --render
+appVersion: "1.0.0"

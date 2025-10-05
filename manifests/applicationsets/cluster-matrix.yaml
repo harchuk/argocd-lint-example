@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: storefront-matrix
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  environment: stage
+          - git:
+              repoURL: https://github.com/example/ecommerce-app.git
+              revision: main
+              directories:
+                - path: apps/storefront/*
+  template:
+    metadata:
+      name: '{{cluster.name}}-{{path.basename}}'
+    spec:
+      project: platform
+      source:
+        repoURL: https://github.com/example/ecommerce-app.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: '{{cluster.server}}'
+        namespace: storefront
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true

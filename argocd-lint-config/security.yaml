@@ -1,0 +1,22 @@
+# Security team's rulebook emphasising governance and custom policy bundles
+severityThreshold: warn
+
+rules:
+  AR009:
+    severity: error
+  AR010:
+    severity: error
+  AR011:
+    severity: error
+
+plugins:
+  - bundles/security
+  - policy-plugins/custom
+
+overrides:
+  - pattern: "manifests/**/secrets/**"
+    rules:
+      AR009:
+        severity: error
+      AR001:
+        severity: error

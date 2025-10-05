@@ -1,0 +1,11 @@
+# Overrides for production Argo CD projects
+severityThreshold: info
+
+rules:
+  AR005:
+    severity: error
+  AR010:
+    severity: warn
+
+plugins:
+  - bundles/security

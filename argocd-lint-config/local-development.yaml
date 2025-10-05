@@ -1,0 +1,19 @@
+# Lightweight config for developers running argocd-lint locally
+severityThreshold: error
+
+rules:
+  AR001:
+    severity: warn
+  AR004:
+    severity: info
+  AR005:
+    enabled: false
+
+# Allow experiments in scratch directories
+overrides:
+  - pattern: "manifests/scratch/**"
+    rules:
+      AR001:
+        enabled: false
+      AR007:
+        enabled: false

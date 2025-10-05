@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payments-service-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: payments-service
+    environment: dev
+spec:
+  project: payments
+  source:
+    repoURL: https://github.com/example/gitops.git
+    targetRevision: main
+    path: services/payments/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: payments-dev
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
+  revisionHistoryLimit: 3

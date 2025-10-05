@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: storefront-composite
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: storefront
+    component: composite
+spec:
+  project: platform
+  sources:
+    - repoURL: https://github.com/example/ecommerce-cm.git
+      targetRevision: main
+      path: clusters/shared/ingress
+    - repoURL: https://github.com/example/ecommerce-app.git
+      targetRevision: main
+      path: deploy/kustomize
+      kustomize:
+        namePrefix: storefront-
+    - repoURL: https://github.com/example/ecommerce-helm.git
+      targetRevision: 1.12.5
+      chart: edge-router
+      helm:
+        valueFiles:
+          - values/production.yaml
+        parameters:
+          - name: image.tag
+            value: "1.12.5"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: storefront
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 2
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 3m

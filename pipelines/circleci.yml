@@ -4,6 +4,8 @@ jobs:
   lint:
     machine:
       image: ubuntu-2204:2023.04.2
+    environment:
+      ARGOCD_LINT_IMAGE: ghcr.io/harchuk/argocd-lint/argocd-lint:latest
     steps:
       - checkout
       - run:
@@ -26,13 +28,13 @@ jobs:
           name: Baseline lint
           command: |
             docker run --rm -v "$PWD:/workspace" -w /workspace \
-              ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+              "$ARGOCD_LINT_IMAGE" \
               manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
       - run:
           name: Render + dry-run lint
           command: |
             docker run --rm -v "$PWD:/workspace" -w /workspace \
-              ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+              "$ARGOCD_LINT_IMAGE" \
               manifests --rules argocd-lint-config/prod-strict.yaml --render \
               --dry-run kubeconform \
               --helm-binary /workspace/.lint-tools/helm \
@@ -43,7 +45,7 @@ jobs:
           name: Security lint (JSON)
           command: |
             docker run --rm -v "$PWD:/workspace" -w /workspace \
-              ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+              "$ARGOCD_LINT_IMAGE" \
               manifests --rules argocd-lint-config/security.yaml \
               --plugin-dir policy-plugins/custom --format json > argocd-lint-security.json
       - store_artifacts:

@@ -7,6 +7,9 @@ pr:
 pool:
   vmImage: ubuntu-latest
 
+variables:
+  ARGOCD_LINT_IMAGE: ghcr.io/harchuk/argocd-lint/argocd-lint:latest
+
 stages:
   - stage: lint
     displayName: argocd-lint checks
@@ -33,13 +36,13 @@ stages:
 
           - script: |
               docker run --rm -v "$(System.DefaultWorkingDirectory):/workspace" -w /workspace \
-                ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+                $(ARGOCD_LINT_IMAGE) \
                 manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
             displayName: Baseline lint
 
           - script: |
               docker run --rm -v "$(System.DefaultWorkingDirectory):/workspace" -w /workspace \
-                ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+                $(ARGOCD_LINT_IMAGE) \
                 manifests --rules argocd-lint-config/prod-strict.yaml --render \
                 --helm-binary /workspace/.lint-tools/helm \
                 --kustomize-binary /workspace/.lint-tools/kustomize \
@@ -48,7 +51,7 @@ stages:
 
           - script: |
               docker run --rm -v "$(System.DefaultWorkingDirectory):/workspace" -w /workspace \
-                ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+                $(ARGOCD_LINT_IMAGE) \
                 manifests --rules argocd-lint-config/prod-strict.yaml --render \
                 --dry-run kubeconform \
                 --helm-binary /workspace/.lint-tools/helm \
@@ -59,7 +62,7 @@ stages:
 
           - script: |
               docker run --rm -v "$(System.DefaultWorkingDirectory):/workspace" -w /workspace \
-                ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+                $(ARGOCD_LINT_IMAGE) \
                 manifests --rules argocd-lint-config/security.yaml \
                 --plugin-dir policy-plugins/custom --format json > argocd-lint-security.json
             displayName: Security rulebook

@@ -29,7 +29,7 @@
   ```bash
   scripts/lint_security.sh --severity-threshold=warn --format json
   ```
-- В отчётах появятся пользовательские идентификаторы нарушений (`TEAM_LABEL_REQUIRED`, `DRY_RUN_RECOMMENDED`).
+- В отчётах появятся пользовательские идентификаторы нарушений (`RG_TEAM_LABEL`, `RG_DRY_RUN`).
 
 ## Сценарий 4. Разделение rulebook по командам
 
@@ -40,6 +40,29 @@
 
 - Используйте `argocd-lint-config/repo-server.yaml` как основу для Config Management Plugin.
 - Файл `pipelines/argo-workflows.yaml` показывает, как встроить линтер в Argo Workflows, который часто используется для кастомных pre-sync проверок.
+
+## Сценарий 6. ApplicationSet plan и drift-preview
+
+- Используйте `scripts/appset_plan.sh` или команду `argocd-lint applicationset plan --file manifests/applicationsets/cluster-matrix.yaml --argocd-version v2.10.0`.
+- Plan показывает, какие приложения будут созданы/обновлены/удалены при следующем sync, что удобно для review.
+- Добавьте флаг `--format json`, чтобы отправлять результат в CI-артефакты или уведомления.
+
+## Сценарий 7. Каталог Rego-плагинов
+
+- Благодаря `metadata` секции можно получить сводку правил по команде:
+  ```bash
+  scripts/list_plugins.sh
+  ```
+- Выход `plugins list` подходит для генерации документации или автоматической валидации severity.
+
+## Сценарий 8. Проверка AppProject guardrails
+
+- Проверьте `manifests/projects/good/platform-project.yaml` и `manifests/projects/bad/open-project.yaml`.
+- Запустите:
+  ```bash
+  argocd-lint manifests/projects --rules argocd-lint-config/baseline.yaml --argocd-version v2.10.0
+  ```
+- В продакшене это помогает убедиться, что проекты ограничивают источники/назначения и описывают роли.
 
 ## Советы по расширению
 

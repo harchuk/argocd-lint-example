@@ -1,5 +1,8 @@
 name: argocd-lint
 
+env:
+  ARGOCD_LINT_IMAGE: ghcr.io/harchuk/argocd-lint/argocd-lint:latest
+
 on:
   pull_request:
   push:
@@ -73,7 +76,7 @@ jobs:
           docker run --rm \
             -v "$PWD:/workspace" \
             -w /workspace \
-            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            "${ARGOCD_LINT_IMAGE}" \
             ${LINT_ARGS}
 
       - name: Export SARIF report (baseline only)
@@ -82,7 +85,7 @@ jobs:
           docker run --rm \
             -v "$PWD:/workspace" \
             -w /workspace \
-            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            "${ARGOCD_LINT_IMAGE}" \
             manifests --rules argocd-lint-config/baseline.yaml --format sarif > argocd-lint.sarif
 
       - name: Upload findings to GitHub Code Scanning

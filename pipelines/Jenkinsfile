@@ -1,5 +1,8 @@
 pipeline {
   agent any
+  environment {
+    ARGOCD_LINT_IMAGE = "ghcr.io/harchuk/argocd-lint/argocd-lint:latest"
+  }
   stages {
     stage('Checkout') {
       steps {
@@ -30,7 +33,7 @@ pipeline {
         sh '''
           set -euo pipefail
           docker run --rm -v "$PWD:/workspace" -w /workspace \
-            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            "$ARGOCD_LINT_IMAGE" \
             manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
         '''
       }
@@ -40,7 +43,7 @@ pipeline {
         sh '''
           set -euo pipefail
           docker run --rm -v "$PWD:/workspace" -w /workspace \
-            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            "$ARGOCD_LINT_IMAGE" \
             manifests --rules argocd-lint-config/prod-strict.yaml --render \
             --helm-binary /workspace/.lint-tools/helm \
             --kustomize-binary /workspace/.lint-tools/kustomize \
@@ -53,7 +56,7 @@ pipeline {
         sh '''
           set -euo pipefail
           docker run --rm -v "$PWD:/workspace" -w /workspace \
-            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            "$ARGOCD_LINT_IMAGE" \
             manifests --rules argocd-lint-config/prod-strict.yaml --render \
             --dry-run kubeconform \
             --helm-binary /workspace/.lint-tools/helm \
@@ -68,7 +71,7 @@ pipeline {
         sh '''
           set -euo pipefail
           docker run --rm -v "$PWD:/workspace" -w /workspace \
-            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            "$ARGOCD_LINT_IMAGE" \
             manifests --rules argocd-lint-config/security.yaml \
             --plugin-dir policy-plugins/custom --format json > argocd-lint-security.json
         '''

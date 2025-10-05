@@ -11,6 +11,7 @@
   - `applicationsets/` включает list/matrix генераторы с валидными и проблемными шаблонами.
 - `render-sources/` — Helm chart и Kustomize оverlay-и, которые можно реально отрендерить через `--render`.
 - `argocd-lint-config/` — разнообразные rulebook-и (baseline, prod, security, repo-server, team-local).
+- `manifests/projects/` — примеры AppProject с хорошими и плохими настройками ограничений.
 - `policy-plugins/custom/` — кастомные Rego-правила как пример расширения политики.
 - `scripts/` и `Makefile` — обёртки под разные сценарии запуска (`render`, `dry-run`, `security`).
 - `pipelines/` и `.github/workflows/` — готовые конфигурации для GitHub Actions, GitLab CI, Azure Pipelines, CircleCI, Argo Workflows и Jenkins.
@@ -28,7 +29,20 @@
      ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
      manifests/bad --rules argocd-lint-config/baseline.yaml --severity-threshold=warn || true
    ```
-3. Для полного сценария используйте make-цели или скрипты в `scripts/` — они совместимы с локальным бинарником и запуском через контейнер.
+3. Предпросмотр генерации ApplicationSet (требуется `argocd-lint` ≥ 0.2.0):
+   ```bash
+   scripts/appset_plan.sh
+   # или напрямую
+   argocd-lint applicationset plan --file manifests/applicationsets/cluster-matrix.yaml --argocd-version v2.10.0
+   ```
+4. Ознакомьтесь с метаданными плагинов:
+   ```bash
+   scripts/list_plugins.sh
+   docker run --rm -v "$PWD:/workspace" -w /workspace \
+     ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+     plugins list --dir policy-plugins/custom
+   ```
+5. Для полного сценария используйте make-цели или скрипты в `scripts/` — они совместимы с локальным бинарником и запуском через контейнер.
 
 ## Примеры манифестов
 
@@ -40,6 +54,7 @@
 | Vault plugin | `manifests/advanced/app-plugin-vault.yaml` | `spec.source.plugin` и безопасность секретов.
 | Matrix ApplicationSet | `manifests/applicationsets/cluster-matrix.yaml` | `matrix` генератор + строгие `goTemplateOptions`.
 | Рендер из репо | `manifests/advanced/app-render-{helm,kustomize}.yaml` | Реальные пути к `render-sources/` для `--render`.
+| AppProject guardrails | `manifests/projects/good/platform-project.yaml` | Ограничения источников/назначений и роли проекта.
 | Проблемные практики | `manifests/bad/*.yaml` | Плавающие ревизии, пропущенные namespaces, агрессивные `ignoreDifferences`.
 
 ## Конфигурации линтера
@@ -68,6 +83,8 @@ argocd-lint manifests/advanced/app-plugin-vault.yaml --rules argocd-lint-config/
 | `make lint-render` | Включает `--render` и автоматически подтягивает `helm`/`kustomize`, если они доступны.
 | `make lint-security` | Проверяет манифесты с учётом кастомных Rego-плагинов безопасности.
 | `make lint-dry-run` | Комбинирует `--render` с `--dry-run` (по умолчанию `kubeconform`).
+| `make plan-appset` | Вызывает `argocd-lint applicationset plan` для `cluster-matrix` ApplicationSet.
+| `make plugins-list` | Показывает метаданные пользовательских Rego-плагинов.
 
 Скрипты в `scripts/` можно вызывать напрямую и комбинировать с флагами `argocd-lint`, например:
 
@@ -75,6 +92,13 @@ argocd-lint manifests/advanced/app-plugin-vault.yaml --rules argocd-lint-config/
 DRY_RUN_MODE=server KUBECONFIG=$HOME/.kube/prod scripts/lint_with_dry_run.sh --format sarif
 scripts/lint_security.sh --severity-threshold=info --appsets-only
 ```
+
+## Возможности argocd-lint 0.2.0
+
+- `scripts/appset_plan.sh` демонстрирует новый подкоманду `argocd-lint applicationset plan` и использование `--argocd-version` для фиксации схемы Argo CD.
+- `scripts/list_plugins.sh` и обновлённые Rego-файлы иллюстрируют метаданные, которые теперь выводятся через `argocd-lint plugins list`.
+- Каталог `manifests/projects/` добавляет хорошие и плохие AppProject, чтобы отследить новые guardrails на уровне проектов.
+- Все пользовательские плагины теперь описывают `metadata`, что упрощает каталогизацию и настройку через rulebook-и.
 
 ## CI/CD пайплайны
 
@@ -84,6 +108,8 @@ scripts/lint_security.sh --severity-threshold=info --appsets-only
 - Azure Pipelines: `pipelines/azure-pipelines.yml` выполняет серию прогонов с тем же образом и публикует результаты.
 - CircleCI: `pipelines/circleci.yml` работает на machine-экзекьюторе и использует контейнерный `argocd-lint` + артефакты.
 - Argo Workflows: `pipelines/argo-workflows.yaml` запускает линтер напрямую из контейнера с Git-артефактом репозитория.
+
+> Все пайплайны читают переменную `ARGOCD_LINT_IMAGE`, поэтому можно легко переключиться на `ghcr.io/harchuk/argocd-lint/argocd-lint:<tag>` с поддержкой новых возможностей (например, 0.2.0).
 
 Дополнительные мысли:
 

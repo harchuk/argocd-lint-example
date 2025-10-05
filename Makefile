@@ -1,4 +1,4 @@
-.PHONY: lint lint-render lint-security lint-dry-run
+.PHONY: lint lint-render lint-security lint-dry-run plan-appset plugins-list
 
 lint:
 	scripts/lint.sh
@@ -11,3 +11,9 @@ lint-security:
 
 lint-dry-run:
 	scripts/lint_with_dry_run.sh --severity-threshold=error
+
+plan-appset:
+	scripts/appset_plan.sh
+
+plugins-list:
+	scripts/list_plugins.sh

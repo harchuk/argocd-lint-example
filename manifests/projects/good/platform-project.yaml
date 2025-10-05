@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Platform team guardrails for multi-tenant clusters
+  sourceRepos:
+    - https://github.com/example/gitops.git
+    - https://github.com/example/ecommerce-app.git
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: Namespace
+    - group: networking.k8s.io
+      kind: Ingress
+  namespaceResourceBlacklist:
+    - group: batch
+      kind: Job
+  roles:
+    - name: deployers
+      description: CI pipelines allowed to sync apps in this project
+      policies:
+        - p, proj:platform:deployers, applications, sync, platform/*, allow
+      groups:
+        - oidc:github/platform
+    - name: readonly
+      description: Read-only access to application statuses
+      policies:
+        - p, proj:platform:readonly, applications, get, platform/*, allow

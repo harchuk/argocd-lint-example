@@ -1,35 +1,51 @@
 version: 2.1
 
-orbs:
-  go: circleci/go@1.11.0
-  helm: circleci/helm@1.4.2
-
 jobs:
   lint:
-    docker:
-      - image: cimg/go:1.22
+    machine:
+      image: ubuntu-2204:2023.04.2
     steps:
       - checkout
-      - go/install-tools:
-          cache: true
-          tools: github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
+      - run:
+          name: Prepare tooling
+          command: |
+            set -euo pipefail
+            mkdir -p .lint-tools
+            curl -sSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz -o .lint-tools/helm.tgz
+            tar -xzf .lint-tools/helm.tgz -C .lint-tools linux-amd64/helm
+            mv .lint-tools/linux-amd64/helm .lint-tools/helm
+            rm -rf .lint-tools/linux-amd64 .lint-tools/helm.tgz
+            curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.1.0/kustomize_v5.1.0_linux_amd64.tar.gz -o .lint-tools/kustomize.tgz
+            tar -xzf .lint-tools/kustomize.tgz -C .lint-tools kustomize
+            rm .lint-tools/kustomize.tgz
+            curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz -o .lint-tools/kubeconform.tgz
+            tar -xzf .lint-tools/kubeconform.tgz -C .lint-tools kubeconform
+            rm .lint-tools/kubeconform.tgz
+            chmod +x .lint-tools/helm .lint-tools/kustomize .lint-tools/kubeconform
       - run:
           name: Baseline lint
-          command: scripts/lint.sh --severity-threshold=warn
-      - helm/install-helm:
-          version: v3.14.0
-      - run:
-          name: Install kustomize
-          command: go install sigs.k8s.io/kustomize/kustomize/v5@v5.1.0
-      - run:
-          name: Render + lint + dry-run
           command: |
-            export HELM_BINARY=$(command -v helm)
-            export KUSTOMIZE_BINARY=$(command -v kustomize)
-            scripts/lint_with_dry_run.sh --severity-threshold=error --format table
+            docker run --rm -v "$PWD:/workspace" -w /workspace \
+              ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+              argocd-lint manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
+      - run:
+          name: Render + dry-run lint
+          command: |
+            docker run --rm -v "$PWD:/workspace" -w /workspace \
+              ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+              argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render \
+              --dry-run kubeconform \
+              --helm-binary /workspace/.lint-tools/helm \
+              --kustomize-binary /workspace/.lint-tools/kustomize \
+              --kubeconform-binary /workspace/.lint-tools/kubeconform \
+              --severity-threshold=error
       - run:
           name: Security lint (JSON)
-          command: scripts/lint_security.sh --format json > argocd-lint-security.json
+          command: |
+            docker run --rm -v "$PWD:/workspace" -w /workspace \
+              ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+              argocd-lint manifests --rules argocd-lint-config/security.yaml \
+              --plugin-dir policy-plugins/custom --format json > argocd-lint-security.json
       - store_artifacts:
           path: argocd-lint-security.json
 

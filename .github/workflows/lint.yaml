@@ -13,58 +13,77 @@ jobs:
       matrix:
         include:
           - name: baseline
-            command: scripts/lint.sh --severity-threshold=warn
+            args: >-
+              manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
           - name: render
-            command: scripts/lint_with_render.sh --severity-threshold=warn
-            setup_render: true
+            args: >-
+              manifests --rules argocd-lint-config/prod-strict.yaml --render
+              --helm-binary /workspace/.lint-tools/helm
+              --kustomize-binary /workspace/.lint-tools/kustomize
+              --severity-threshold=warn
+            needs_render_tools: true
           - name: security
-            command: scripts/lint_security.sh --severity-threshold=warn
-            setup_plugins: true
+            args: >-
+              manifests --rules argocd-lint-config/security.yaml
+              --plugin-dir policy-plugins/custom
+              --severity-threshold=warn
           - name: dry-run
-            command: scripts/lint_with_dry_run.sh --severity-threshold=error
-            setup_render: true
-            setup_dry_run: true
+            args: >-
+              manifests --rules argocd-lint-config/prod-strict.yaml --render
+              --helm-binary /workspace/.lint-tools/helm
+              --kustomize-binary /workspace/.lint-tools/kustomize
+              --kubeconform-binary /workspace/.lint-tools/kubeconform
+              --dry-run kubeconform
+              --severity-threshold=error
+            needs_render_tools: true
+            needs_kubeconform: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Cache Go build artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: go-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: go-${{ runner.os }}-
-
-      - name: Install argocd-lint
-        run: go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
-
-      - name: Install Helm
-        if: matrix.setup_render == true
-        uses: azure/setup-helm@v4
-
-      - name: Install Kustomize
-        if: matrix.setup_render == true
-        uses: imranismail/setup-kustomize@v2
-        with:
-          kustomize-version: '5.0.3'
+      - name: Prepare render tooling
+        if: matrix.needs_render_tools == true
+        run: |
+          set -euo pipefail
+          mkdir -p .lint-tools
+          curl -sSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz -o .lint-tools/helm.tgz
+          tar -xzf .lint-tools/helm.tgz -C .lint-tools linux-amd64/helm
+          mv .lint-tools/linux-amd64/helm .lint-tools/helm
+          rm -rf .lint-tools/linux-amd64 .lint-tools/helm.tgz
+          curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.1.0/kustomize_v5.1.0_linux_amd64.tar.gz -o .lint-tools/kustomize.tgz
+          tar -xzf .lint-tools/kustomize.tgz -C .lint-tools kustomize
+          rm .lint-tools/kustomize.tgz
+          chmod +x .lint-tools/helm .lint-tools/kustomize
 
       - name: Install kubeconform
-        if: matrix.setup_dry_run == true
-        run: go install github.com/yannh/kubeconform/cmd/kubeconform@latest
+        if: matrix.needs_kubeconform == true
+        run: |
+          set -euo pipefail
+          mkdir -p .lint-tools
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz -o .lint-tools/kubeconform.tgz
+          tar -xzf .lint-tools/kubeconform.tgz -C .lint-tools kubeconform
+          rm .lint-tools/kubeconform.tgz
+          chmod +x .lint-tools/kubeconform
 
       - name: Run argocd-lint (${{ matrix.name }})
-        run: ${{ matrix.command }}
+        env:
+          LINT_ARGS: ${{ matrix.args }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            argocd-lint ${LINT_ARGS}
 
       - name: Export SARIF report (baseline only)
         if: matrix.name == 'baseline'
-        run: argocd-lint manifests --rules argocd-lint-config/baseline.yaml --format sarif > argocd-lint.sarif
+        run: |
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            argocd-lint manifests --rules argocd-lint-config/baseline.yaml --format sarif > argocd-lint.sarif
 
       - name: Upload findings to GitHub Code Scanning
         if: matrix.name == 'baseline'

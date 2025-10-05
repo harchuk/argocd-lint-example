@@ -7,38 +7,61 @@ pr:
 pool:
   vmImage: ubuntu-latest
 
-variables:
-  GO_VERSION: '1.22'
-
 stages:
   - stage: lint
     displayName: argocd-lint checks
     jobs:
       - job: lint
         steps:
-          - task: GoTool@0
-            inputs:
-              version: $(GO_VERSION)
+          - checkout: self
 
           - script: |
-              go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
-            displayName: Install argocd-lint
+              set -euo pipefail
+              mkdir -p .lint-tools
+              curl -sSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz -o .lint-tools/helm.tgz
+              tar -xzf .lint-tools/helm.tgz -C .lint-tools linux-amd64/helm
+              mv .lint-tools/linux-amd64/helm .lint-tools/helm
+              rm -rf .lint-tools/linux-amd64 .lint-tools/helm.tgz
+              curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.1.0/kustomize_v5.1.0_linux_amd64.tar.gz -o .lint-tools/kustomize.tgz
+              tar -xzf .lint-tools/kustomize.tgz -C .lint-tools kustomize
+              rm .lint-tools/kustomize.tgz
+              curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz -o .lint-tools/kubeconform.tgz
+              tar -xzf .lint-tools/kubeconform.tgz -C .lint-tools kubeconform
+              rm .lint-tools/kubeconform.tgz
+              chmod +x .lint-tools/helm .lint-tools/kustomize .lint-tools/kubeconform
+            displayName: Prepare tooling
 
           - script: |
-              scripts/lint.sh --severity-threshold=warn
+              docker run --rm -v "$(System.DefaultWorkingDirectory):/workspace" -w /workspace \
+                ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+                argocd-lint manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
             displayName: Baseline lint
 
           - script: |
-              sudo curl -L https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar -xz
-              sudo mv linux-amd64/helm /usr/local/bin/helm
-              GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@v5.1.0
-              export HELM_BINARY=$(command -v helm)
-              export KUSTOMIZE_BINARY=$(command -v kustomize)
-              scripts/lint_with_render.sh --severity-threshold=warn
+              docker run --rm -v "$(System.DefaultWorkingDirectory):/workspace" -w /workspace \
+                ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+                argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render \
+                --helm-binary /workspace/.lint-tools/helm \
+                --kustomize-binary /workspace/.lint-tools/kustomize \
+                --severity-threshold=warn
             displayName: Render + lint
 
           - script: |
-              scripts/lint_security.sh --severity-threshold=warn --format json > argocd-lint-security.json
+              docker run --rm -v "$(System.DefaultWorkingDirectory):/workspace" -w /workspace \
+                ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+                argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render \
+                --dry-run kubeconform \
+                --helm-binary /workspace/.lint-tools/helm \
+                --kustomize-binary /workspace/.lint-tools/kustomize \
+                --kubeconform-binary /workspace/.lint-tools/kubeconform \
+                --severity-threshold=error
+            displayName: Render + dry-run
+
+          - script: |
+              docker run --rm -v "$(System.DefaultWorkingDirectory):/workspace" -w /workspace \
+                ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+                argocd-lint manifests --rules argocd-lint-config/security.yaml \
+                --plugin-dir policy-plugins/custom --format json > argocd-lint-security.json
             displayName: Security rulebook
 
           - task: PublishBuildArtifacts@1

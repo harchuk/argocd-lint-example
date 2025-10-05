@@ -1,43 +1,83 @@
 pipeline {
   agent any
-  environment {
-    GOPATH = "${WORKSPACE}/.go"
-    GOCACHE = "${WORKSPACE}/.cache/go-build"
-  }
   stages {
-    stage('Install argocd-lint') {
+    stage('Checkout') {
       steps {
-        sh 'mkdir -p $GOPATH $GOCACHE'
-        sh 'go env -w GOPATH=$GOPATH GOCACHE=$GOCACHE'
-        sh 'go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest'
+        checkout scm
       }
     }
-    stage('Lint manifests') {
-      steps {
-        sh '$GOPATH/bin/argocd-lint manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn'
-      }
-    }
-    stage('Lint manifests (render)') {
+    stage('Prepare tooling') {
       steps {
         sh '''
           set -euo pipefail
-          HELM=$(command -v helm || true)
-          KUSTOMIZE=$(command -v kustomize || true)
-          EXTRA_FLAGS=""
-          if [ -n "$HELM" ]; then
-            EXTRA_FLAGS="$EXTRA_FLAGS --helm-binary $HELM"
-          fi
-          if [ -n "$KUSTOMIZE" ]; then
-            EXTRA_FLAGS="$EXTRA_FLAGS --kustomize-binary $KUSTOMIZE"
-          fi
-          $GOPATH/bin/argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render $EXTRA_FLAGS
+          mkdir -p .lint-tools
+          curl -sSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz -o .lint-tools/helm.tgz
+          tar -xzf .lint-tools/helm.tgz -C .lint-tools linux-amd64/helm
+          mv .lint-tools/linux-amd64/helm .lint-tools/helm
+          rm -rf .lint-tools/linux-amd64 .lint-tools/helm.tgz
+          curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.1.0/kustomize_v5.1.0_linux_amd64.tar.gz -o .lint-tools/kustomize.tgz
+          tar -xzf .lint-tools/kustomize.tgz -C .lint-tools kustomize
+          rm .lint-tools/kustomize.tgz
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz -o .lint-tools/kubeconform.tgz
+          tar -xzf .lint-tools/kubeconform.tgz -C .lint-tools kubeconform
+          rm .lint-tools/kubeconform.tgz
+          chmod +x .lint-tools/helm .lint-tools/kustomize .lint-tools/kubeconform
+        '''
+      }
+    }
+    stage('Baseline lint') {
+      steps {
+        sh '''
+          set -euo pipefail
+          docker run --rm -v "$PWD:/workspace" -w /workspace \
+            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            argocd-lint manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
+        '''
+      }
+    }
+    stage('Render lint') {
+      steps {
+        sh '''
+          set -euo pipefail
+          docker run --rm -v "$PWD:/workspace" -w /workspace \
+            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render \
+            --helm-binary /workspace/.lint-tools/helm \
+            --kustomize-binary /workspace/.lint-tools/kustomize \
+            --severity-threshold=warn
+        '''
+      }
+    }
+    stage('Dry-run lint') {
+      steps {
+        sh '''
+          set -euo pipefail
+          docker run --rm -v "$PWD:/workspace" -w /workspace \
+            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render \
+            --dry-run kubeconform \
+            --helm-binary /workspace/.lint-tools/helm \
+            --kustomize-binary /workspace/.lint-tools/kustomize \
+            --kubeconform-binary /workspace/.lint-tools/kubeconform \
+            --severity-threshold=error
+        '''
+      }
+    }
+    stage('Security lint') {
+      steps {
+        sh '''
+          set -euo pipefail
+          docker run --rm -v "$PWD:/workspace" -w /workspace \
+            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            argocd-lint manifests --rules argocd-lint-config/security.yaml \
+            --plugin-dir policy-plugins/custom --format json > argocd-lint-security.json
         '''
       }
     }
   }
   post {
     always {
-      archiveArtifacts artifacts: '**/argocd-lint*.{json,sarif}', allowEmptyArchive: true
+      archiveArtifacts artifacts: 'argocd-lint-security.json', allowEmptyArchive: true
     }
   }
 }

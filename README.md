@@ -16,6 +16,20 @@
 - `pipelines/` и `.github/workflows/` — готовые конфигурации для GitHub Actions, GitLab CI, Azure Pipelines, CircleCI, Argo Workflows и Jenkins.
 - `docs/advanced-scenarios.md` — углублённые сценарии использования.
 
+## Быстрый старт
+
+1. Получите `argocd-lint` удобным способом:
+   - Go: `go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest`
+   - Контейнер: `docker pull ghcr.io/harchuk/argocd-lint/argocd-lint:latest`
+2. Быстрый прогон по валидным и проблемным примерам:
+   ```bash
+   argocd-lint manifests/good
+   docker run --rm -v "$PWD:/workspace" -w /workspace \
+     ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+     argocd-lint manifests/bad --rules argocd-lint-config/baseline.yaml --severity-threshold=warn || true
+   ```
+3. Для полного сценария используйте make-цели или скрипты в `scripts/` — они совместимы с локальным бинарником и запуском через контейнер.
+
 ## Примеры манифестов
 
 | Сценарий | Файл | Что показывает |
@@ -64,12 +78,12 @@ scripts/lint_security.sh --severity-threshold=info --appsets-only
 
 ## CI/CD пайплайны
 
-- GitHub Actions: `.github/workflows/lint.yaml` запускает матрицу сценариев (baseline, render, security, dry-run) и выгружает SARIF.
-- GitLab CI: `pipelines/gitlab-ci.yml` кеширует Go и сохраняет JSON отчёт.
-- Jenkins: `pipelines/Jenkinsfile` показывает stages с установкой инструментов и архивированием артефактов.
-- Azure Pipelines: `pipelines/azure-pipelines.yml` выполняет несколько прогонов и публикует результат.
-- CircleCI: `pipelines/circleci.yml` демонстрирует установку через orbs и сохранение артефактов.
-- Argo Workflows: `pipelines/argo-workflows.yaml` реализует DAG из трёх шагов для запуска `argocd-lint` внутри Kubernetes.
+- GitHub Actions: `.github/workflows/lint.yaml` подкачивает образ `ghcr.io/harchuk/argocd-lint/argocd-lint` и гоняет матрицу сценариев (baseline, render, security, dry-run) с выгрузкой SARIF.
+- GitLab CI: `pipelines/gitlab-ci.yml` использует docker-in-docker, чтобы запускать контейнерный линтер и сохранять JSON отчёт.
+- Jenkins: `pipelines/Jenkinsfile` готовит вспомогательные бинарники и вызывает `argocd-lint` через контейнер на каждом этапе.
+- Azure Pipelines: `pipelines/azure-pipelines.yml` выполняет серию прогонов с тем же образом и публикует результаты.
+- CircleCI: `pipelines/circleci.yml` работает на machine-экзекьюторе и использует контейнерный `argocd-lint` + артефакты.
+- Argo Workflows: `pipelines/argo-workflows.yaml` запускает линтер напрямую из контейнера с Git-артефактом репозитория.
 
 Дополнительные мысли:
 

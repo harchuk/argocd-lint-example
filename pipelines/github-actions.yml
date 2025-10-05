@@ -1,5 +1,5 @@
-# Reusable GitHub Actions job that can be dropped into a composite workflow.
-# Demonstrates how to parameterize severity threshold and optional rendering.
+# Reusable GitHub Actions job that runs argocd-lint from the published container image.
+# Demonstrates how to parameterize severity threshold and optional rendering tools.
 name: lint-argocd
 
 on:
@@ -20,12 +20,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Install argocd-lint
-        run: go install github.com/argocd-lint/argocd-lint/cmd/argocd-lint@latest
+      - name: Prepare tooling (optional render)
+        if: inputs.render == true
+        run: |
+          set -euo pipefail
+          mkdir -p .lint-tools
+          curl -sSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz -o .lint-tools/helm.tgz
+          tar -xzf .lint-tools/helm.tgz -C .lint-tools linux-amd64/helm
+          mv .lint-tools/linux-amd64/helm .lint-tools/helm
+          rm -rf .lint-tools/linux-amd64 .lint-tools/helm.tgz
+          curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.1.0/kustomize_v5.1.0_linux_amd64.tar.gz -o .lint-tools/kustomize.tgz
+          tar -xzf .lint-tools/kustomize.tgz -C .lint-tools kustomize
+          rm .lint-tools/kustomize.tgz
+          chmod +x .lint-tools/helm .lint-tools/kustomize
 
       - name: Run argocd-lint
         env:
@@ -33,8 +40,12 @@ jobs:
           WITH_RENDER: ${{ inputs.render }}
         run: |
           set -euo pipefail
-          ARGS=(manifests --rules argocd-lint-config/baseline.yaml --severity-threshold="${SEVERITY_THRESHOLD}")
+          ARGS=(manifests --rules argocd-lint-config/baseline.yaml --severity-threshold "${SEVERITY_THRESHOLD}")
           if [[ "${WITH_RENDER}" == "true" ]]; then
-            ARGS+=(--render)
+            ARGS+=(--render --helm-binary /workspace/.lint-tools/helm --kustomize-binary /workspace/.lint-tools/kustomize)
           fi
-          argocd-lint "${ARGS[@]}"
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
+            argocd-lint "${ARGS[@]}"

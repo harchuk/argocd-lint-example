@@ -48,4 +48,4 @@ jobs:
             -v "$PWD:/workspace" \
             -w /workspace \
             ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
-            argocd-lint "${ARGS[@]}"
+            "${ARGS[@]}"

@@ -31,7 +31,7 @@ pipeline {
           set -euo pipefail
           docker run --rm -v "$PWD:/workspace" -w /workspace \
             ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
-            argocd-lint manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
+            manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
         '''
       }
     }
@@ -41,7 +41,7 @@ pipeline {
           set -euo pipefail
           docker run --rm -v "$PWD:/workspace" -w /workspace \
             ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
-            argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render \
+            manifests --rules argocd-lint-config/prod-strict.yaml --render \
             --helm-binary /workspace/.lint-tools/helm \
             --kustomize-binary /workspace/.lint-tools/kustomize \
             --severity-threshold=warn
@@ -54,7 +54,7 @@ pipeline {
           set -euo pipefail
           docker run --rm -v "$PWD:/workspace" -w /workspace \
             ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
-            argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --render \
+            manifests --rules argocd-lint-config/prod-strict.yaml --render \
             --dry-run kubeconform \
             --helm-binary /workspace/.lint-tools/helm \
             --kustomize-binary /workspace/.lint-tools/kustomize \
@@ -69,7 +69,7 @@ pipeline {
           set -euo pipefail
           docker run --rm -v "$PWD:/workspace" -w /workspace \
             ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
-            argocd-lint manifests --rules argocd-lint-config/security.yaml \
+            manifests --rules argocd-lint-config/security.yaml \
             --plugin-dir policy-plugins/custom --format json > argocd-lint-security.json
         '''
       }

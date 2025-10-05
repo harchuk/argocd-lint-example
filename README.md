@@ -26,7 +26,7 @@
    argocd-lint manifests/good
    docker run --rm -v "$PWD:/workspace" -w /workspace \
      ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
-     argocd-lint manifests/bad --rules argocd-lint-config/baseline.yaml --severity-threshold=warn || true
+     manifests/bad --rules argocd-lint-config/baseline.yaml --severity-threshold=warn || true
    ```
 3. Для полного сценария используйте make-цели или скрипты в `scripts/` — они совместимы с локальным бинарником и запуском через контейнер.
 

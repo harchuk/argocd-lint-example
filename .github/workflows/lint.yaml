@@ -74,7 +74,7 @@ jobs:
             -v "$PWD:/workspace" \
             -w /workspace \
             ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
-            argocd-lint ${LINT_ARGS}
+            ${LINT_ARGS}
 
       - name: Export SARIF report (baseline only)
         if: matrix.name == 'baseline'
@@ -83,7 +83,7 @@ jobs:
             -v "$PWD:/workspace" \
             -w /workspace \
             ghcr.io/harchuk/argocd-lint/argocd-lint:latest \
-            argocd-lint manifests --rules argocd-lint-config/baseline.yaml --format sarif > argocd-lint.sarif
+            manifests --rules argocd-lint-config/baseline.yaml --format sarif > argocd-lint.sarif
 
       - name: Upload findings to GitHub Code Scanning
         if: matrix.name == 'baseline'

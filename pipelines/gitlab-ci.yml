@@ -15,8 +15,8 @@ lint:argocd:
     - apk add --no-cache curl tar
   script:
     - docker pull ghcr.io/harchuk/argocd-lint/argocd-lint:latest
-    - docker run --rm -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/harchuk/argocd-lint/argocd-lint:latest argocd-lint manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
-    - docker run --rm -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/harchuk/argocd-lint/argocd-lint:latest argocd-lint manifests --rules argocd-lint-config/prod-strict.yaml --format json > argocd-lint.json
+    - docker run --rm -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/harchuk/argocd-lint/argocd-lint:latest manifests --rules argocd-lint-config/baseline.yaml --severity-threshold=warn
+    - docker run --rm -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/harchuk/argocd-lint/argocd-lint:latest manifests --rules argocd-lint-config/prod-strict.yaml --format json > argocd-lint.json
   artifacts:
     when: always
     paths:
